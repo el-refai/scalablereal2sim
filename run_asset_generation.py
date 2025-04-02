@@ -93,13 +93,18 @@ def run_segmentation(data_dir: str, output_dir: str) -> None:
         "attached to the end of a metallic robotic arm."
     )
 
+    hand_txt = (
+        "Two human hands, each with five fingers, "
+        "palm and wrist, positioned in a way to grasp the object."
+    )
+
     # Generate the object masks.
     segment_moving_obj_data(
         rgb_dir=os.path.join(data_dir, "rgb"),
         output_dir=os.path.join(output_dir, "masks"),
         txt_prompt=object_of_interest,
         txt_prompt_index=1,
-        neg_txt_prompt=gripper_txt,
+        neg_txt_prompt=hand_txt,  # gripper_txt,
     )
     torch.cuda.empty_cache()
 
@@ -107,7 +112,7 @@ def run_segmentation(data_dir: str, output_dir: str) -> None:
     segment_moving_obj_data(
         rgb_dir=os.path.join(data_dir, "rgb"),
         output_dir=os.path.join(output_dir, "gripper_masks"),
-        txt_prompt=gripper_txt,
+        txt_prompt=hand_txt,  # gripper_txt,
         txt_prompt_index=1,
         neg_txt_prompt=object_of_interest,
     )
@@ -455,51 +460,51 @@ def main(
             replace_trimesh_mesh_material(bundle_sdf_mesh_path)
             logging.info(f"Canonicalized BundleSDF mesh: {bundle_sdf_mesh_path}")
 
-            # Physical property estimation in the BundleSDF frame.
-            bundle_sdf_inertia_params_path = os.path.join(
-                object_dir, "bundle_sdf_inertial_params.json"
-            )
-            identify_grasped_object_payload(
-                robot_joint_data_path=robot_id_dir,
-                object_joint_data_path=os.path.join(object_dir, "system_id_data"),
-                object_mesh_path=bundle_sdf_mesh_path,
-                json_output_path=bundle_sdf_inertia_params_path,
-            )
-            with open(bundle_sdf_inertia_params_path, "r") as f:
-                bundle_sdf_inertia_params = json.load(f)
+            # # Physical property estimation in the BundleSDF frame.
+            # bundle_sdf_inertia_params_path = os.path.join(
+            #     object_dir, "bundle_sdf_inertial_params.json"
+            # )
+            # identify_grasped_object_payload(
+            #     robot_joint_data_path=robot_id_dir,
+            #     object_joint_data_path=os.path.join(object_dir, "system_id_data"),
+            #     object_mesh_path=bundle_sdf_mesh_path,
+            #     json_output_path=bundle_sdf_inertia_params_path,
+            # )
+            # with open(bundle_sdf_inertia_params_path, "r") as f:
+            #     bundle_sdf_inertia_params = json.load(f)
 
-            # Output the BundleSDF SDFormat file.
-            bundle_sdf_sdf_output_dir = os.path.join(
-                object_output_dir, f"{object_name}_bundle_sdf.sdf"
-            )
-            create_sdf(
-                model_name=object_name,
-                mesh_parts_dir_name=f"{object_name}_bundle_sdf_parts",
-                output_path=bundle_sdf_sdf_output_dir,
-                visual_mesh_path=bundle_sdf_mesh_path,
-                collision_mesh_path=bundle_sdf_mesh_path,
-                mass=bundle_sdf_inertia_params["mass"],
-                center_of_mass=np.array(bundle_sdf_inertia_params["center_of_mass"]),
-                moment_of_inertia=np.array(bundle_sdf_inertia_params["inertia_matrix"]),
-                use_hydroelastic=False,  # Enable for more accurate but Drake-specific SDFormat
-                use_coacd=True,
-            )
+            # # Output the BundleSDF SDFormat file.
+            # bundle_sdf_sdf_output_dir = os.path.join(
+            #     object_output_dir, f"{object_name}_bundle_sdf.sdf"
+            # )
+            # create_sdf(
+            #     model_name=object_name,
+            #     mesh_parts_dir_name=f"{object_name}_bundle_sdf_parts",
+            #     output_path=bundle_sdf_sdf_output_dir,
+            #     visual_mesh_path=bundle_sdf_mesh_path,
+            #     collision_mesh_path=bundle_sdf_mesh_path,
+            #     mass=bundle_sdf_inertia_params["mass"],
+            #     center_of_mass=np.array(bundle_sdf_inertia_params["center_of_mass"]),
+            #     moment_of_inertia=np.array(bundle_sdf_inertia_params["inertia_matrix"]),
+            #     use_hydroelastic=False,  # Enable for more accurate but Drake-specific SDFormat
+            #     use_coacd=True,
+            # )
 
-            # Nerfacto reconstruction + SDFormat output.
-            nerfstudio_output_dir = os.path.join(object_output_dir, "nerfstudio")
-            run_nerfstudio(
-                data_dir=object_dir,
-                output_dir=nerfstudio_output_dir,
-                use_depth=use_depth,
-            )
+            # # Nerfacto reconstruction + SDFormat output.
+            # nerfstudio_output_dir = os.path.join(object_output_dir, "nerfstudio")
+            # run_nerfstudio(
+            #     data_dir=object_dir,
+            #     output_dir=nerfstudio_output_dir,
+            #     use_depth=use_depth,
+            # )
 
-            # Frosting reconstruction + SDFormat output.
-            frosting_output_dir = os.path.join(object_output_dir, "frosting")
-            run_frosting(
-                data_dir=object_dir,
-                output_dir=frosting_output_dir,
-                use_depth=use_depth,
-            )
+            # # Frosting reconstruction + SDFormat output.
+            # frosting_output_dir = os.path.join(object_output_dir, "frosting")
+            # run_frosting(
+            #     data_dir=object_dir,
+            #     output_dir=frosting_output_dir,
+            #     use_depth=use_depth,
+            # )
 
             # Neuralangelo reconstruction + SDFormat output.
             neuralangelo_output_dir = os.path.join(object_output_dir, "neuralangelo")
