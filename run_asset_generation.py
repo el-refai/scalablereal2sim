@@ -134,15 +134,36 @@ def run_bundle_sdf_tracking_and_reconstruction(
     output_dir = os.path.abspath(output_dir)
     os.chdir(bundle_sdf_dir)
     torch.cuda.empty_cache()
-    subprocess.run(
-        "source .venv/bin/activate && "
-        f"python run_custom.py --video_dir {data_dir} "
-        f"--out_folder {output_dir} --use_gui 1 "
-        f"--interpolate_missing_vertices {int(interpolate_missing_vertices)}",
-        cwd=bundle_sdf_dir,
-        shell=True,
-        executable="/bin/bash",
-    )
+    # subprocess.run(
+    #     "source .venv/bin/activate && "
+    #     f"python run_custom.py --video_dir {data_dir} "
+    #     f"--out_folder {output_dir} --use_gui 1 "
+    #     f"--interpolate_missing_vertices {int(interpolate_missing_vertices)}",
+    #     cwd=bundle_sdf_dir,
+    #     shell=True,
+    #     executable="/bin/bash",
+    # )
+    try:
+        command = (
+            f"source .venv/bin/activate && "
+            f"python run_custom.py --video_dir {data_dir} "
+            f"--out_folder {output_dir} --use_gui 1 "
+            f"--interpolate_missing_vertices {int(interpolate_missing_vertices)}"
+        )
+
+        result = subprocess.run(
+            command,
+            cwd=bundle_sdf_dir,
+            shell=True,
+            executable="/bin/bash",
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError as e:
+        print(f"Command failed with exit code {e.returncode}")
+        print(f"Error output: {e.stderr}")
+
     os.chdir(current_dir)
 
     # Extract data.
@@ -383,8 +404,9 @@ def replace_trimesh_mesh_material(mesh_path: str) -> None:
 
 def main(
     data_dir: str,
-    robot_id_dir: str,
+    # robot_id_dir: str,
     output_dir: str,
+    skip_downsample: bool = False,
     skip_segmentation: bool = False,
     bundle_sdf_interpolate_missing_vertices: bool = False,
     use_depth: bool = False,
@@ -422,7 +444,8 @@ def main(
 
         try:
             # Downsample images to not run out of memory.
-            downsample_images(object_dir, num_images=1800)
+            if not skip_downsample:
+                downsample_images(object_dir, num_images=1800)
 
             # Generate object and gripper masks.
             if not skip_segmentation:
@@ -434,10 +457,10 @@ def main(
                     raise FileNotFoundError(
                         "Object masks not found. Please run segmentation first."
                     )
-                if not os.path.exists(os.path.join(object_dir, "gripper_masks")):
-                    raise FileNotFoundError(
-                        "Gripper masks not found. Please run segmentation first."
-                    )
+                # if not os.path.exists(os.path.join(object_dir, "gripper_masks")):
+                #     raise FileNotFoundError(
+                #         "Gripper masks not found. Please run segmentation first."
+                #     )
 
             # Object tracking + BundleSDF reconstruction.
             logging.info("Running BundleSDF tracking and reconstruction...")
@@ -520,37 +543,37 @@ def main(
             )
             logging.info(f"Canonicalized Neuralangelo mesh: {neuralangelo_mesh_path}")
 
-            # Physical property estimation in the Neuralangelo frame.
-            neuralangelo_inertia_params_path = os.path.join(
-                object_dir, "neuralangelo_inertial_params.json"
-            )
-            identify_grasped_object_payload(
-                robot_joint_data_path=robot_id_dir,
-                object_joint_data_path=os.path.join(object_dir, "system_id_data"),
-                object_mesh_path=neuralangelo_mesh_path,
-                json_output_path=neuralangelo_inertia_params_path,
-            )
-            with open(neuralangelo_inertia_params_path, "r") as f:
-                neuralangelo_inertia_params = json.load(f)
+            # # Physical property estimation in the Neuralangelo frame.
+            # neuralangelo_inertia_params_path = os.path.join(
+            #     object_dir, "neuralangelo_inertial_params.json"
+            # )
+            # identify_grasped_object_payload(
+            #     robot_joint_data_path=robot_id_dir,
+            #     object_joint_data_path=os.path.join(object_dir, "system_id_data"),
+            #     object_mesh_path=neuralangelo_mesh_path,
+            #     json_output_path=neuralangelo_inertia_params_path,
+            # )
+            # with open(neuralangelo_inertia_params_path, "r") as f:
+            #     neuralangelo_inertia_params = json.load(f)
 
-            # Output the Neuralangelo SDFormat file.
-            neuralangelo_sdf_output_dir = os.path.join(
-                object_output_dir, f"{object_name}_neuralangelo.sdf"
-            )
-            create_sdf(
-                model_name=object_name,
-                mesh_parts_dir_name=f"{object_name}_neuralangelo_parts",
-                output_path=neuralangelo_sdf_output_dir,
-                visual_mesh_path=neuralangelo_mesh_path,
-                collision_mesh_path=neuralangelo_mesh_path,
-                mass=neuralangelo_inertia_params["mass"],
-                center_of_mass=np.array(neuralangelo_inertia_params["center_of_mass"]),
-                moment_of_inertia=np.array(
-                    neuralangelo_inertia_params["inertia_matrix"]
-                ),
-                use_hydroelastic=False,  # Enable for more accurate but Drake-specific SDFormat
-                use_coacd=True,
-            )
+            # # Output the Neuralangelo SDFormat file.
+            # neuralangelo_sdf_output_dir = os.path.join(
+            #     object_output_dir, f"{object_name}_neuralangelo.sdf"
+            # )
+            # create_sdf(
+            #     model_name=object_name,
+            #     mesh_parts_dir_name=f"{object_name}_neuralangelo_parts",
+            #     output_path=neuralangelo_sdf_output_dir,
+            #     visual_mesh_path=neuralangelo_mesh_path,
+            #     collision_mesh_path=neuralangelo_mesh_path,
+            #     mass=neuralangelo_inertia_params["mass"],
+            #     center_of_mass=np.array(neuralangelo_inertia_params["center_of_mass"]),
+            #     moment_of_inertia=np.array(
+            #         neuralangelo_inertia_params["inertia_matrix"]
+            #     ),
+            #     use_hydroelastic=False,  # Enable for more accurate but Drake-specific SDFormat
+            #     use_coacd=True,
+            # )
 
             logging.info(f"Finished processing object: {object_dir}")
             torch.cuda.empty_cache()
@@ -574,15 +597,15 @@ if __name__ == "__main__":
         help="Path to the directory where the collected data is saved. This should be "
         "the top-level directory that contains all the object subdirectories.",
     )
-    parser.add_argument(
-        "--robot-id-dir",
-        type=str,
-        required=True,
-        help="Path to the directory where the robot ID data is saved. This should be "
-        "the top-level directory that contains all different gripper opening "
-        "subdirectories. NOTE that the robot parameters should have already been "
-        "identified.",
-    )
+    # parser.add_argument(
+    #     "--robot-id-dir",
+    #     type=str,
+    #     required=True,
+    #     help="Path to the directory where the robot ID data is saved. This should be "
+    #     "the top-level directory that contains all different gripper opening "
+    #     "subdirectories. NOTE that the robot parameters should have already been "
+    #     "identified.",
+    # )
     parser.add_argument(
         "--output-dir",
         type=str,
@@ -612,6 +635,11 @@ if __name__ == "__main__":
         help="If specified, use depth images for geometric reconstruction when "
         "supported by the reconstruction method.",
     )
+    parser.add_argument(
+        "--skip-downsample",
+        action="store_true",
+        help="If specified, skips downsampling images, note can cause out of memory issues",
+    )
     args = parser.parse_args()
 
     if not os.path.exists(args.data_dir):
@@ -622,8 +650,9 @@ if __name__ == "__main__":
 
     main(
         data_dir=args.data_dir,
-        robot_id_dir=args.robot_id_dir,
+        # robot_id_dir=args.robot_id_dir,
         output_dir=args.output_dir,
+        skip_downsample=args.skip_downsample,
         skip_segmentation=args.skip_segmentation,
         bundle_sdf_interpolate_missing_vertices=args.bundle_sdf_interpolate_missing_vertices,
         use_depth=args.use_depth,
